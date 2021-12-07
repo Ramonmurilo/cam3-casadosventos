@@ -82,7 +82,20 @@ ARQUIVOS=(
     "r211108.cam2.h0.2022-05.nc"
     "r211109.cam2.h0.2022-05.nc"
 )
-
+ARQUIVOS_CLIMA=(
+    "01_climo.nc"
+    "02_climo.nc"
+    "03_climo.nc"
+    "04_climo.nc"
+    "05_climo.nc"
+    "06_climo.nc"
+    "07_climo.nc"
+    "08_climo.nc"
+    "09_climo.nc"
+    "10_climo.nc"
+    "11_climo.nc"
+    "12_climo.nc"
+)
 
 ########################################################################################
 # Baixa o modelo, ferramentas relativas e bibliotecas necessárias para instalação.
@@ -94,12 +107,21 @@ ARQUIVOS=(
 ########################################################################################
 download () {
     echo "baixando tudo: relaxou, pois pode demorar até o output começar a aparecer..."
+
+    for i in "${ARQUIVOS_CLIMA[@]}"; do
+        ID=$($path/gdrive list -m 10 --query "name contains '$i'" |\
+            awk '{print $1}' |\
+            awk 'NR==2')
+        $path/gdrive download $ID --skip --path $path/dados_clima/$1
+    done
+
     for i in "${ARQUIVOS[@]}"; do
         ID=$($path/gdrive list -m 10 --query "name contains '$i'" |\
             awk '{print $1}' |\
             awk 'NR==2')
         $path/gdrive download $ID --skip --path $path/dados/$1
     done
+    
     echo "todas as dependências foram baixadas."
 }
 

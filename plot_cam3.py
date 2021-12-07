@@ -16,6 +16,9 @@ from cartopy.util import add_cyclic_point
 from cftime import DatetimeNoLeap
 import pendulum
 from dateutil.relativedelta import relativedelta
+import os
+from datetime import datetime
+import recorte
 
 def addcbar(plot, ax, cblabel="", orientation="horizontal", rotation=0, ticks=None):
     """
@@ -116,6 +119,9 @@ def get_lead(ano, mes, lead):
         membro = xr.open_dataset(caminho_completo, decode_times=False)
         membro = xr.decode_cf(membro, use_cftime=True)
 
+        # recorta o NC
+        membro = recorte.by_lat_lon(membro, lat_interval=(-15.1,-0.8), lon_interval=(-28.9, 45.4), tipo='nc')
+
         # adiciona uma coordenada para indicar o membro do arquivo
         membro["membro"] = dia_rodada
         membros.append(membro)
@@ -136,11 +142,10 @@ def preparar_dados(ano, mes):
       mes_mkdir = '0'+ str(mes) 
     else:
       mes_mkdir = str(mes)   
-    if os.path.exists (f'IMAGENS/CAM3/{ano}/r{ano_2digitos}{mes_mkdir}') == True:
-      print (f'A pasta /IMAGENS/CAM3/{ano}/r{ano_2digitos}{mes_mkdir} já existe !') 
+    if os.path.exists (f'IMAGENS/') == True:
+      print (f'A pasta /IMAGENS/!') 
     else :
-      os.mkdir(f'IMAGENS/CAM3/{ano}/r{ano_2digitos}{mes_mkdir}')
-      os.mkdir(f'IMAGENS/CAM3/{ano}/r{ano_2digitos}{mes_mkdir}/ensemble')
+      os.mkdir(f'IMAGENS')
       print (f'As pastas r{ano_2digitos}{mes_mkdir} e ensemble foram criadas com sucesso!')
     mes = str(mes) 
 
@@ -173,14 +178,20 @@ def vento(ax, dados_cam, clima, membro, lev):
   vento_v = dataset.V.sel(lev=lev, method='nearest')                  # Escolhe o nível na dimensão 'lev'
 
   clima_u = clima.U.sel(lev=lev, method='nearest')                    # Escolhe o nível na dimensão 'lev'
-  clima_v = clima.V.sel(lev=lev, method='nearest')                    # Escolhe o nível na dimensão 'lev'
+  clima_v = clima.V.sel(lev=lev, method='nearest')
+  print(vento_u)                    # Escolhe o nível na dimensão 'lev'
 
-  anom_u = vento_u.groupby('time.month').mean() - clima_u.groupby('time.month').mean().values                       # Cria anomalia de U
-  anom_v = vento_v.groupby('time.month').mean() - clima_v.groupby('time.month').mean().values                       # Cria anomalia de V
+  #anom_u = vento_u.groupby('time.month').mean() - clima_u.groupby('time.month').mean().values                       # Cria anomalia de U
+  #anom_v = vento_v.groupby('time.month').mean() - clima_v.groupby('time.month').mean().values                       # Cria anomalia de V
 
-  anom_u_sel = anom_u.isel(month=0)
-  anom_v_sel = anom_v.isel(month=0)
+  anom_u = vento_u.mean() - clima_u.mean().values                       # Cria anomalia de U
+  anom_v = vento_v.mean() - clima_v.mean().values  
 
+  #print(anom_u)
+  anom_u_sel = anom_u#.isel(month=0)
+  anom_v_sel = anom_v#.isel(month=0)
+
+  print(anom_u_sel)
   uvel, lonu = add_cyclic_point(anom_u_sel, coord=anom_u_sel.lon)
   vvel, lonv = add_cyclic_point(anom_v_sel, coord=anom_u_sel.lon)
 
@@ -210,11 +221,11 @@ def vento(ax, dados_cam, clima, membro, lev):
   gl = geoaxes_format(ax)
   ax.coastlines("50m")
   ax.add_feature(cartopy.feature.BORDERS, linestyle='-', alpha=.5)
-  estados_br = cfeature.NaturalEarthFeature(category='cultural', scale='50m', facecolor='none', name='admin_1_states_provinces')
+  #estados_br = cfeature.NaturalEarthFeature(category='cultural', scale='50m', facecolor='none', name='admin_1_states_provinces')
   #estados_br = cfeature.NaturalEarthFeature(category='cultural', scale='50m', facecolor='none', name='admin_1_states_provinces_shp')
-  ax.add_feature(estados_br, edgecolor='gray')
-  ax.set_extent([-83,-30,-53, 7], crs=crs_latlon)
-  add_contornos(ax=ax, shapefiles=['estados.shp','america_do_sul.shp'])
+  #ax.add_feature(estados_br, edgecolor='gray')
+  #ax.set_extent([-83,-30,-53, 7], crs=crs_latlon)
+  #add_contornos(ax=ax, shapefiles=['estados.shp','america_do_sul.shp'])
 
   if membro == 'ensemble':
     ax.set_title(f"Média dos 6 membros", fontdict={'fontsize': 18}, loc = 'center')
@@ -462,7 +473,8 @@ for loop_lead in range(1,7):                        # loop operacional para gera
   data_lead = data_index.strftime('%b/%Y')[0]       # Transforma da data do lead em string
   data_lead_pendulum = pendulum.from_format(data_index.strftime('%m/%Y')[0], 'MM/YYYY')
 
-  clima = xr.open_dataset(f"/content/drive/My Drive/IC_CAM/CLIMA/{mes_lead}_climo.nc")
+  clima = xr.open_dataset(f"dados_clima/{mes_lead}_climo.nc")
+  clima = recorte.by_lat_lon(clima, lat_interval=(-15.1,-0.8), lon_interval=(-28.9, 45.4), tipo='nc')
   
   ######## PLOT DO VENTO ########
   niveis = [1000, 850, 500, 200]
@@ -482,7 +494,7 @@ for loop_lead in range(1,7):                        # loop operacional para gera
     elif lev == 500 or lev == 200:
       cb = fig.colorbar(sp.lines, ax=ax.ravel().tolist(), ticks=[0,2,4,6,8,10,15,20,25])
       cb.ax.tick_params(labelsize=20)
-    fig.savefig(f'/content/drive/My Drive/IC_CAM/IMAGENS/CAM3/{ano}/r{ano_2digitos}{mes_savefig}/wind_anom_{lev}_membros_{mes_lead}_{ano_lead_4digitos}.png', bbox_inches='tight')
+    fig.savefig(f'IMAGENS/{ano}/r{ano_2digitos}{mes_savefig}/wind_anom_{lev}_membros_{mes_lead}_{ano_lead_4digitos}.png', bbox_inches='tight')
 
     fig, ax = plt.subplots( nrows=1,ncols=1,subplot_kw=dict(projection = ccrs.PlateCarree()), figsize=(32,16))
     plt.suptitle(f"LAMMOC - Anomalia de vento em {lev} hPa - \n{data_lead} (Cond.Inicial:{mes}/{ano_2digitos})", fontsize=24, fontweight='bold', x= 0.6)
@@ -494,8 +506,8 @@ for loop_lead in range(1,7):                        # loop operacional para gera
     elif lev == 500 or lev == 200:
       cb = fig.colorbar(sp.lines, ax=ax, ticks=[0,2,4,6,8,10,15,20,25])
       cb.ax.tick_params(labelsize=20)
-    fig.savefig(f'/content/drive/My Drive/IC_CAM/IMAGENS/CAM3/{ano}/r{ano_2digitos}{mes_savefig}/ensemble/wind_anom_{lev}_ensemble_{mes_lead}_{ano_lead_4digitos}.png', bbox_inches='tight')
-  
+    fig.savefig(f'IMAGENS/{ano}/r{ano_2digitos}{mes_savefig}/ensemble/wind_anom_{lev}_ensemble_{mes_lead}_{ano_lead_4digitos}.png', bbox_inches='tight')
+  '''
   ######## PLOT DA PRESSÃO ########
   fig, ax = plt.subplots( nrows=2,ncols=3,subplot_kw=dict(projection = ccrs.PlateCarree()), figsize=(32,16))
   plt.suptitle(f"LAMMOC - Anomalia de Pressão ao nível do mar (hPa) - {data_lead} (Cond.Inicial:{mes}/{ano_2digitos})", fontsize=24, fontweight='bold')
@@ -590,7 +602,7 @@ for loop_lead in range(1,7):                        # loop operacional para gera
   cb = fig.colorbar(p, ax=ax, ticks=[-300,-200,-100,-50,-25,-10,0,10,25,50,100,200,300])
   cb.ax.tick_params(labelsize=20)
   fig.savefig(f'/content/drive/My Drive/IC_CAM/IMAGENS/CAM3/{ano}/r{ano_2digitos}{mes_savefig}/ensemble/precip_anom_ensemble_{mes_lead}_{ano_lead_4digitos}.png', bbox_inches='tight')
-
+'''
 count_time2 = datetime.now()                            #horário de término da rodada    #ident0
 tempo_de_rodada = count_time2 - count_time              # diferença entre horario de inicio e termino...   #ident0
                                                         #(a diferença soluciona o problema quanto ao datetime não ser horario de brasilia)  #ident0
